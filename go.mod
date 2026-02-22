@@ -3,7 +3,7 @@ module github.com/khyallin/shardkv-dashboard
 go 1.24.11
 
 require (
-	github.com/khyallin/shardkv v0.0.0-20251226155844-312897900af1
+	github.com/khyallin/shardkv v0.0.0-20260222061656-0667adccac52
 	github.com/moby/moby/api v1.52.0
 	github.com/moby/moby/client v0.2.1
 )
@@ -26,5 +26,5 @@ require (
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
-	golang.org/x/sys v0.35.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )

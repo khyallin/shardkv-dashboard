@@ -12,6 +12,14 @@ type Group struct {
 	Servers []string
 }
 
+func getServers(gid config.Tgid) []string {
+	servers := make([]string, NServer)
+	for i := range servers {
+		servers[i] = fmt.Sprintf("shardkv-server-%d-%d", gid, i)
+	}
+	return servers
+}
+
 func (skv *ShardKV) MakeServer(name string, gid config.Tgid, me int, servers string) string {
 	containerID, _ := skv.docker.ContainerCreate(
 		ImageName,

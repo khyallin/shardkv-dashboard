@@ -1,0 +1,19 @@
+仓库shardkv是键值数据库的一个节点，仓库shardkv-dashboard是一个前后端分离的、键值数据库的管理系统。
+我要基于shardkv开发shardkv-dashboard，最基本的操作已经封装在package docker和package shardkv，过程中我将使用ai开发。、
+
+展示：
+- 集群的每个分片组，每个分片组包含的节点（controller.Controller.Query()获取 config.Config 对象 Groups 值）
+- 每个分片组分配到的分片（controller.Controller.Query()获取 config.Config 对象 Shards 值）
+- 分片组的负载（client.Clerk.Status()获取分片组负载）
+
+操作：
+- 新增、删除分片组（config.Config 对象 Groups 改动, controller.Controller.ChangeConfigTo()修改配置）
+- 手动把分片配置到分片组（config.Config 对象 Shards 改动, controller.Controller.ChangeConfigTo()修改配置）
+- 自动把分片配置到分片组（负载均衡，待设计）
+- 查询键值对（client.Clerk.Get()方法）
+- 新增、删除、修改键值对（client.Clerk.Put()方法）
+
+其他：
+- 前端技术栈暂不确定
+- controller.Controller 是一个短期的控制器，可以不断创建、多个并发调用ChangeConfigTo()、立即销毁。ChangeConfigTo() 会自动处理并发修改配置冲突。
+- 如果只有95%的程度了解这个项目，可以向我提问。
