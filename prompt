@@ -17,3 +17,91 @@
 - 前端技术栈暂不确定
 - controller.Controller 是一个短期的控制器，可以不断创建、多个并发调用ChangeConfigTo()、立即销毁。ChangeConfigTo() 会自动处理并发修改配置冲突。
 - 如果只有95%的程度了解这个项目，可以向我提问。
+
+接口设计：
+
+- 获取集群配置信息（封装 controller.Controller.Query()）
+GET /api/v1/config
+struct Req {}
+struct Resp {
+    code    int
+    message string
+    num     int
+    shards  [NShards]int
+    groups  map[int][]string
+}
+
+- 新增分片组（封装 controller.Controller.ChangeConfigTo()）
+POST /api/v1/config
+struct Req {
+    gid int
+}
+struct Resp {
+    code    int
+    message string
+}
+
+- 删除分片组（封装 controller.Controller.ChangeConfigTo()）
+DELETE /api/v1/config
+struct Req {
+    gid int
+}
+struct Resp {
+    code    int
+    message string
+}
+
+- 手动移动分片 (封装 controller.Controller.ChangeConfigTo())
+POST /api/v1/config
+struct Req {
+    shard int
+    from  int
+    to    int
+}
+struct Resp {
+    code    int
+    message string
+}
+
+- 自动负载均衡 （待设计）
+POST /api/v1/config/auto
+struct Req {
+    auto bool
+}
+struct Resp {
+    code    int
+    message string
+}
+
+- 查询键（封装 client.clerk.Get()）
+GET /api/v1/kv
+struct Req {
+    key string
+}
+struct Resp {
+    code    int
+    message string
+    value   string
+    version int
+}
+
+- 新增/修改键（封装 client.clerk.Put()）
+POST /api/v1/kv
+struct Req {
+    key     string
+    value   string
+}
+struct Resp {
+    code    int
+    message string
+}
+
+- 删除键（封装 client.clerk.Put() tombstone）
+DELETE /api/v1/kv
+struct Req {
+    key string
+}
+struct Resp {
+    code    int
+    message string
+}
