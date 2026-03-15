@@ -6,6 +6,6 @@ import (
 )
 
 func (skv *ShardKV) MakeCtrler() *controller.Controller {
-	servers := getServers(config.Gid0)
+	servers := GetServers(config.Gid0)
 	return controller.MakeController(servers)
 }

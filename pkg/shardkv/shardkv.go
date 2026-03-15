@@ -1,7 +1,7 @@
 package shardkv
 
 import (
-	"github.com/khyallin/shardkv-dashboard/docker"
+	"github.com/khyallin/shardkv-dashboard/pkg/docker"
 )
 
 type ShardKV struct {

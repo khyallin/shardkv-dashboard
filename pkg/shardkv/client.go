@@ -6,6 +6,6 @@ import (
 )
 
 func (skv *ShardKV) MakeClient() *client.Clerk {
-	servers := getServers(config.Gid0)
+	servers := GetServers(config.Gid0)
 	return client.MakeClerk(servers)
 }

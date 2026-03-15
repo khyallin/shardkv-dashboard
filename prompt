@@ -21,7 +21,7 @@
 接口设计：
 
 - 获取集群配置信息（封装 controller.Controller.Query()）
-GET /api/v1/config
+GET /api/v1/groups
 struct Req {}
 struct Resp {
     code    int
@@ -32,17 +32,17 @@ struct Resp {
 }
 
 - 新增分片组（封装 controller.Controller.ChangeConfigTo()）
-POST /api/v1/config
+POST /api/v1/group
 struct Req {
-    gid int
 }
 struct Resp {
     code    int
     message string
+    gid     int
 }
 
-- 删除分片组（封装 controller.Controller.ChangeConfigTo()）
-DELETE /api/v1/config
+- 停止分片组（封装 controller.Controller.ChangeConfigTo()）
+POST /api/v1/group
 struct Req {
     gid int
 }
@@ -90,16 +90,6 @@ POST /api/v1/kv
 struct Req {
     key     string
     value   string
-}
-struct Resp {
-    code    int
-    message string
-}
-
-- 删除键（封装 client.clerk.Put() tombstone）
-DELETE /api/v1/kv
-struct Req {
-    key string
 }
 struct Resp {
     code    int
