@@ -81,7 +81,8 @@ struct Req {
 struct Resp {
     code    int
     message string
-    value   string
+    type    string
+    value   any
     version int
 }
 
@@ -89,7 +90,8 @@ struct Resp {
 POST /api/v1/kv
 struct Req {
     key     string
-    value   string
+    type    string
+    value   any
 }
 struct Resp {
     code    int

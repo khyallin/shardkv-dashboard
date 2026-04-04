@@ -156,6 +156,20 @@ type GroupRunningStatus struct {
 	AvgLatency time.Duration
 }
 
+func (s *ConfigService) GroupStatus(gid int) (float64, float64, float64, time.Duration, time.Duration, error) {
+	if gid <= 0 || gid > len(s.groups) {
+		return 0, 0, 0, 0, 0, fmt.Errorf("ConfigService GetGroupRunningStatus: group %d not found", gid)
+	}
+	if s.groups[gid].Status != shardkv.StatusRunning {
+		return 0, 0, 0, 0, 0, fmt.Errorf("ConfigService GetGroupRunningStatus: group %d is not running", gid)
+	}
+	totalQPS, doneQPS, successQPS, maxLatency, avgLatency, err := s.client.Status(config.Tgid(gid))
+	if err != api.OK {
+		return 0, 0, 0, 0, 0, fmt.Errorf("ConfigService GetGroupRunningStatus: group %d status error: %v", gid, err)
+	}
+	return totalQPS, doneQPS, successQPS, maxLatency, avgLatency, nil
+}
+
 func (s *ConfigService) Rebalance() error {
 	groups := make(map[int]*GroupRunningStatus)
 	for gid, group := range s.groups {

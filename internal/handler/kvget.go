@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,10 +12,11 @@ type KVGetRequest struct {
 }
 
 type KVGetResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Value   string `json:"value"`
-	Version int    `json:"version"`
+	Code    int  		    `json:"code"`
+	Message string 			`json:"message"`
+	Kvtype  string          `json:"type"`
+	Value   json.RawMessage `json:"value"`
+	Version int             `json:"version"`
 }
 
 func (h *Handler) KVGet(c *gin.Context) {
@@ -26,7 +28,7 @@ func (h *Handler) KVGet(c *gin.Context) {
 		})
 		return
 	}
-	value, version, err := h.kvService.Get(req.Key)
+	kvtype, value, version, err := h.kvService.Get(req.Key)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    1,
@@ -37,6 +39,7 @@ func (h *Handler) KVGet(c *gin.Context) {
 	resp := KVGetResponse{
 		Code:    0,
 		Message: "OK",
+		Kvtype:  kvtype,
 		Value:   value,
 		Version: version,
 	}

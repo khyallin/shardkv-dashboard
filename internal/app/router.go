@@ -18,6 +18,8 @@ func registerRoutes(r *gin.Engine) {
 		api.POST("/group/create", h.GroupCreate)
 		// 停止分片组
 		api.POST("/group/stop", h.GroupStop)
+		// 查询分片组状态
+		api.GET("/group/status", h.GroupStatus)
 
 		// 移动分片
 		api.POST("/config", h.ShardMove)
