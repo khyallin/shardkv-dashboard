@@ -1,0 +1,1450 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>ShardKV Dashboard</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg: #f4efe3;
+			--panel: rgba(255, 255, 255, 0.86);
+			--panel-border: rgba(23, 23, 23, 0.08);
+			--text: #18181b;
+			--muted: #57534e;
+			--accent: #0f766e;
+			--accent-soft: rgba(15, 118, 110, 0.12);
+			--accent-strong: #115e59;
+			--warm: #ea580c;
+			--warm-soft: rgba(234, 88, 12, 0.12);
+			--danger: #b91c1c;
+			--danger-soft: rgba(185, 28, 28, 0.12);
+			--success: #166534;
+			--success-soft: rgba(22, 101, 52, 0.12);
+			--info: #1d4ed8;
+			--info-soft: rgba(29, 78, 216, 0.12);
+			--shadow-lg: 0 24px 80px rgba(24, 24, 27, 0.14);
+			--shadow-sm: 0 4px 20px rgba(24, 24, 27, 0.08);
+			--radius-xl: 22px;
+			--radius-lg: 14px;
+			--radius-md: 10px;
+			--radius-sm: 8px;
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
+		html,
+		body {
+			margin: 0;
+			min-height: 100%;
+			color: var(--text);
+			font-family: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", sans-serif;
+			background:
+				radial-gradient(circle at 8% 10%, rgba(15, 118, 110, 0.18), transparent 28%),
+				radial-gradient(circle at 86% 18%, rgba(234, 88, 12, 0.16), transparent 24%),
+				radial-gradient(circle at 50% 100%, rgba(29, 78, 216, 0.12), transparent 30%),
+				linear-gradient(135deg, #f8f4ea 0%, #efe6d4 100%);
+		}
+
+		body {
+			padding: 22px;
+			overflow-x: hidden;
+		}
+
+		.dashboard {
+			position: relative;
+			display: grid;
+			grid-template-columns: 1.85fr 1fr;
+			gap: 18px;
+			max-width: 1500px;
+			margin: 0 auto;
+			align-items: start;
+		}
+
+		.panel {
+			position: relative;
+			background: var(--panel);
+			border: 1px solid var(--panel-border);
+			border-radius: var(--radius-xl);
+			box-shadow: var(--shadow-lg);
+			backdrop-filter: blur(9px);
+			-webkit-backdrop-filter: blur(9px);
+		}
+
+		.cluster-panel {
+			padding: 20px;
+			min-height: min(88vh, 920px);
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+
+		.data-panel {
+			padding: 20px;
+			display: flex;
+			flex-direction: column;
+			gap: 14px;
+		}
+
+		.panel-header {
+			display: flex;
+			justify-content: space-between;
+			gap: 16px;
+			align-items: flex-start;
+			padding-bottom: 10px;
+			border-bottom: 1px solid rgba(24, 24, 27, 0.08);
+		}
+
+		.panel-header h1,
+		.panel-header h2 {
+			margin: 0;
+			font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+			letter-spacing: 0.2px;
+			line-height: 1.15;
+		}
+
+		.panel-header h1 {
+			font-size: clamp(24px, 2.1vw, 34px);
+			font-weight: 700;
+		}
+
+		.panel-header h2 {
+			font-size: clamp(21px, 1.8vw, 29px);
+			font-weight: 700;
+		}
+
+		.panel-meta {
+			margin: 6px 0 0;
+			color: var(--muted);
+			font-size: 13px;
+		}
+
+		.header-actions {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			flex-wrap: wrap;
+		}
+
+		.icon-button {
+			border: 1px solid rgba(24, 24, 27, 0.16);
+			background: #fff;
+			color: var(--text);
+			width: 46px;
+			height: 46px;
+			padding: 0;
+			border-radius: 50%;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			cursor: pointer;
+			transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+			box-shadow: var(--shadow-sm);
+		}
+
+		.icon-button:hover {
+			transform: translateY(-1px) scale(1.02);
+			border-color: rgba(15, 118, 110, 0.45);
+		}
+
+		.icon-button:active {
+			transform: translateY(0);
+		}
+
+		.icon-button:disabled {
+			opacity: 0.56;
+			cursor: not-allowed;
+			transform: none;
+		}
+
+		.refresh-icon {
+			width: 21px;
+			height: 21px;
+			stroke-width: 2;
+			stroke: currentColor;
+			fill: none;
+			display: block;
+			overflow: visible;
+			stroke-linecap: round;
+			stroke-linejoin: round;
+		}
+
+		.icon-button.is-loading .refresh-icon {
+			animation: spin 850ms linear infinite;
+		}
+
+		.toggle-wrap {
+			display: inline-flex;
+			align-items: center;
+			gap: 10px;
+			padding: 8px 11px;
+			border-radius: 999px;
+			border: 1px solid rgba(24, 24, 27, 0.14);
+			background: #fff;
+			box-shadow: var(--shadow-sm);
+			user-select: none;
+		}
+
+		.toggle-wrap span {
+			font-size: 13px;
+			color: var(--muted);
+		}
+
+		.switch {
+			position: relative;
+			width: 44px;
+			height: 24px;
+			display: inline-flex;
+			align-items: center;
+		}
+
+		.switch input {
+			opacity: 0;
+			width: 0;
+			height: 0;
+		}
+
+		.slider {
+			position: absolute;
+			inset: 0;
+			border-radius: 999px;
+			background: #d6d3d1;
+			transition: background 180ms ease;
+			cursor: pointer;
+		}
+
+		.slider::before {
+			content: "";
+			position: absolute;
+			width: 18px;
+			height: 18px;
+			left: 3px;
+			top: 3px;
+			border-radius: 50%;
+			background: #fff;
+			box-shadow: 0 2px 8px rgba(24, 24, 27, 0.2);
+			transition: transform 180ms ease;
+		}
+
+		.switch input:checked + .slider {
+			background: var(--accent);
+		}
+
+		.switch input:checked + .slider::before {
+			transform: translateX(20px);
+		}
+
+		.switch input:disabled + .slider {
+			cursor: not-allowed;
+			opacity: 0.62;
+		}
+
+		.cluster-columns {
+			margin-top: 2px;
+			display: grid;
+			grid-template-columns: 96px 130px minmax(170px, 1fr) minmax(280px, 1.55fr) 88px;
+			align-items: center;
+			gap: 10px;
+			padding: 0 10px;
+			color: #5b5448;
+			font-size: 12px;
+			letter-spacing: 0.5px;
+			text-transform: uppercase;
+		}
+
+		.cluster-list {
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+			min-height: 180px;
+			padding: 2px 0;
+		}
+
+		.group-row {
+			border: 1px solid rgba(24, 24, 27, 0.09);
+			border-radius: var(--radius-lg);
+			background: rgba(255, 255, 255, 0.95);
+			padding: 10px;
+			display: grid;
+			grid-template-columns: 96px 130px minmax(170px, 1fr) minmax(280px, 1.55fr) 88px;
+			gap: 10px;
+			align-items: center;
+			transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+			animation: slide-up 280ms ease;
+		}
+
+		.group-row:hover {
+			border-color: rgba(15, 118, 110, 0.44);
+			transform: translateY(-1px);
+			box-shadow: var(--shadow-sm);
+		}
+
+		.group-row.drag-target {
+			border-color: var(--warm);
+			box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.2);
+			background: #fff8ef;
+		}
+
+		.cell {
+			min-width: 0;
+		}
+
+		.group-chip {
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			height: 34px;
+			min-width: 70px;
+			padding: 0 12px;
+			border-radius: 999px;
+			font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+			font-weight: 700;
+			letter-spacing: 0.6px;
+			background: linear-gradient(135deg, #115e59, #0f766e);
+			color: #fff;
+		}
+
+		.metric-title {
+			margin: 0;
+			color: #6c6458;
+			font-size: 11px;
+			text-transform: uppercase;
+			letter-spacing: 0.45px;
+			line-height: 1.2;
+		}
+
+		.metric-value {
+			margin-top: 0;
+			font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+			font-size: 14px;
+			color: #1f2937;
+			line-height: 1.2;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.metric-sub {
+			margin-top: 3px;
+			color: var(--muted);
+			font-size: 12px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.shard-zone {
+			min-height: 44px;
+			border-radius: var(--radius-md);
+			border: 1px dashed rgba(24, 24, 27, 0.2);
+			background: #faf9f7;
+			padding: 6px;
+			display: flex;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 6px;
+		}
+
+		.shard-zone.is-empty {
+			color: #78716c;
+			font-size: 12px;
+			justify-content: center;
+		}
+
+		.shard-pill {
+			border: none;
+			border-radius: 999px;
+			padding: 6px 10px;
+			background: var(--accent-soft);
+			color: var(--accent-strong);
+			font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+			font-size: 12px;
+			line-height: 1;
+			cursor: grab;
+			transition: transform 140ms ease, background 140ms ease;
+			user-select: none;
+		}
+
+		.shard-pill:hover {
+			transform: translateY(-1px);
+			background: rgba(15, 118, 110, 0.2);
+		}
+
+		.shard-pill:active {
+			cursor: grabbing;
+		}
+
+		.danger-btn,
+		.add-btn,
+		.submit-btn {
+			border: none;
+			border-radius: 10px;
+			cursor: pointer;
+			transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+			font-family: "Noto Sans SC", sans-serif;
+			font-weight: 700;
+		}
+
+		.danger-btn {
+			width: 100%;
+			min-height: 36px;
+			background: var(--danger-soft);
+			color: var(--danger);
+		}
+
+		.danger-btn:hover {
+			transform: translateY(-1px);
+			filter: saturate(108%);
+		}
+
+		.add-row {
+			grid-template-columns: 1fr;
+			justify-items: center;
+			background: linear-gradient(90deg, rgba(15, 118, 110, 0.05), rgba(234, 88, 12, 0.06));
+		}
+
+		.add-btn {
+			width: min(100%, 460px);
+			min-height: 58px;
+			padding: 0 24px;
+			background: transparent;
+			color: #0f766e;
+			border: 1px dashed rgba(15, 118, 110, 0.44);
+			font-size: 18px;
+			letter-spacing: 0.3px;
+			white-space: nowrap;
+		}
+
+		.add-btn:hover {
+			transform: translateY(-1px);
+			box-shadow: var(--shadow-sm);
+			background: rgba(15, 118, 110, 0.08);
+		}
+
+		.message {
+			border-radius: var(--radius-sm);
+			padding: 10px 12px;
+			font-size: 13px;
+			border: 1px solid transparent;
+			margin-top: 2px;
+			animation: fade-in 220ms ease;
+		}
+
+		.message.info {
+			background: var(--info-soft);
+			color: var(--info);
+			border-color: rgba(29, 78, 216, 0.18);
+		}
+
+		.message.success {
+			background: var(--success-soft);
+			color: var(--success);
+			border-color: rgba(22, 101, 52, 0.2);
+		}
+
+		.message.error {
+			background: var(--danger-soft);
+			color: var(--danger);
+			border-color: rgba(185, 28, 28, 0.24);
+		}
+
+		.form-card {
+			border: 1px solid rgba(24, 24, 27, 0.1);
+			border-radius: var(--radius-lg);
+			background: #fff;
+			padding: 14px;
+			display: flex;
+			flex-direction: column;
+			gap: 11px;
+		}
+
+		.form-card h3 {
+			margin: 0;
+			font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+			font-size: 20px;
+			font-weight: 700;
+			letter-spacing: 0.2px;
+		}
+
+		.field-grid {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 10px;
+		}
+
+		.field {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			min-width: 0;
+		}
+
+		.field.full {
+			grid-column: 1 / -1;
+		}
+
+		.field label {
+			font-size: 12px;
+			color: #57534e;
+			letter-spacing: 0.3px;
+		}
+
+		.field input,
+		.field select,
+		.field textarea {
+			border: 1px solid rgba(24, 24, 27, 0.18);
+			border-radius: var(--radius-sm);
+			padding: 9px 10px;
+			background: #fff;
+			color: var(--text);
+			font-size: 14px;
+			font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+			outline: none;
+			transition: border-color 140ms ease, box-shadow 140ms ease;
+		}
+
+		.field textarea {
+			min-height: 90px;
+			resize: vertical;
+			line-height: 1.4;
+		}
+
+		.field input:focus,
+		.field select:focus,
+		.field textarea:focus {
+			border-color: rgba(15, 118, 110, 0.62);
+			box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.13);
+		}
+
+		.field-help {
+			font-size: 12px;
+			color: var(--muted);
+			line-height: 1.25;
+		}
+
+		.submit-btn {
+			min-height: 40px;
+			font-size: 14px;
+			color: #fff;
+			background: linear-gradient(135deg, #0f766e, #115e59);
+		}
+
+		.submit-btn:hover {
+			transform: translateY(-1px);
+			box-shadow: var(--shadow-sm);
+			filter: saturate(108%);
+		}
+
+		.submit-btn.warm {
+			background: linear-gradient(135deg, #ea580c, #c2410c);
+		}
+
+		.submit-btn:disabled {
+			cursor: not-allowed;
+			opacity: 0.62;
+			transform: none;
+			box-shadow: none;
+		}
+
+		.result {
+			border-radius: var(--radius-sm);
+			border: 1px solid rgba(24, 24, 27, 0.1);
+			padding: 10px 12px;
+			font-size: 13px;
+			line-height: 1.5;
+			background: #fafaf9;
+			color: #3f3f46;
+			animation: fade-in 220ms ease;
+		}
+
+		.result.success {
+			border-color: rgba(22, 101, 52, 0.28);
+			background: var(--success-soft);
+			color: var(--success);
+		}
+
+		.result.error {
+			border-color: rgba(185, 28, 28, 0.28);
+			background: var(--danger-soft);
+			color: var(--danger);
+		}
+
+		.result-title {
+			margin: 0 0 8px;
+			font-family: "Space Grotesk", "Noto Sans SC", sans-serif;
+			font-size: 14px;
+			font-weight: 700;
+			line-height: 1.1;
+		}
+
+		.kv-result {
+			margin: 0;
+			display: grid;
+			grid-template-columns: 72px 1fr;
+			gap: 6px 10px;
+		}
+
+		.kv-result dt {
+			color: #6b7280;
+			font-size: 12px;
+		}
+
+		.kv-result dd {
+			margin: 0;
+			color: #111827;
+			font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+			white-space: pre-wrap;
+			word-break: break-word;
+		}
+
+		@media (max-width: 1180px) {
+			.dashboard {
+				grid-template-columns: 1fr;
+			}
+
+			.cluster-panel {
+				min-height: auto;
+			}
+		}
+
+		@media (max-width: 920px) {
+			body {
+				padding: 14px;
+			}
+
+			.cluster-columns {
+				display: none;
+			}
+
+			.group-row {
+				grid-template-columns: 1fr;
+			}
+
+			.group-row .action-cell {
+				justify-self: end;
+				width: 110px;
+			}
+
+			.field-grid {
+				grid-template-columns: 1fr;
+			}
+
+			.panel-header {
+				flex-direction: column;
+			}
+
+			.header-actions {
+				width: 100%;
+				justify-content: flex-start;
+			}
+		}
+
+		@keyframes spin {
+			from {
+				transform: rotate(0deg);
+			}
+
+			to {
+				transform: rotate(360deg);
+			}
+		}
+
+		@keyframes fade-in {
+			from {
+				opacity: 0;
+				transform: translateY(3px);
+			}
+
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		@keyframes slide-up {
+			from {
+				opacity: 0;
+				transform: translateY(8px);
+			}
+
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+	</style>
+</head>
+<body>
+	<main class="dashboard">
+		<section class="panel cluster-panel" aria-label="集群区域">
+			<header class="panel-header">
+				<div>
+					<h1>集群状态</h1>
+					<p class="panel-meta" id="clusterMeta">等待首次刷新...</p>
+				</div>
+
+				<div class="header-actions">
+					<button id="refreshBtn" class="icon-button" type="button" title="手动刷新" aria-label="手动刷新">
+						<svg class="refresh-icon" viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M21 3v6h-6"></path>
+							<path d="M20 9a9 9 0 1 0 2.64 6.36"></path>
+						</svg>
+					</button>
+
+					<label class="toggle-wrap" for="autoToggle">
+						<span>自动负载均衡</span>
+						<span class="switch">
+							<input id="autoToggle" type="checkbox">
+							<span class="slider"></span>
+						</span>
+					</label>
+				</div>
+			</header>
+
+			<div class="cluster-columns" aria-hidden="true">
+				<span>Group</span>
+				<span>节点数量</span>
+				<span>分片组负载</span>
+				<span>分片信息</span>
+				<span>操作</span>
+			</div>
+
+			<div id="clusterList" class="cluster-list" aria-live="polite"></div>
+			<div id="clusterMessage" class="message info">准备就绪，正在连接集群。</div>
+		</section>
+
+		<aside class="panel data-panel" aria-label="数据区域">
+			<header class="panel-header">
+				<div>
+					<h2>数据面板</h2>
+					<p class="panel-meta">查询和更新 Key-Value 数据</p>
+				</div>
+			</header>
+
+			<form id="getForm" class="form-card" novalidate>
+				<h3>Get</h3>
+				<div class="field full">
+					<label for="getKey">Key</label>
+					<input id="getKey" name="getKey" type="text" placeholder="输入要查询的 key" autocomplete="off" required>
+				</div>
+				<button class="submit-btn" type="submit">Get</button>
+				<div id="getResult" class="result" aria-live="polite">等待查询。</div>
+			</form>
+
+			<form id="putForm" class="form-card" novalidate>
+				<h3>Put</h3>
+
+				<div class="field-grid">
+					<div class="field">
+						<label for="putKey">Key</label>
+						<input id="putKey" name="putKey" type="text" placeholder="例如 user.profile.name" autocomplete="off" required>
+					</div>
+
+					<div class="field">
+						<label for="putType">Type</label>
+						<select id="putType" name="putType" required>
+							<option value="string">string</option>
+							<option value="int">int</option>
+							<option value="float">float</option>
+							<option value="bool">bool</option>
+						</select>
+					</div>
+
+					<div class="field full">
+						<label for="putValue">Value</label>
+						<textarea id="putValue" name="putValue" placeholder="例如 hello" required></textarea>
+						<div id="putValueHint" class="field-help">当前类型 string：请输入普通文本。</div>
+					</div>
+
+					<div class="field">
+						<label for="putVersion">Version</label>
+						<input id="putVersion" name="putVersion" type="number" inputmode="numeric" min="0" step="1" placeholder="例如 0" required>
+					</div>
+				</div>
+
+				<button class="submit-btn warm" type="submit">Put</button>
+				<div id="putResult" class="result" aria-live="polite">等待写入。</div>
+			</form>
+		</aside>
+	</main>
+
+	<script>
+		(() => {
+			const REFRESH_INTERVAL_MS = 5000;
+			const endpoint = {
+				groupGet: "/api/v1/group/get",
+				groupStatus: "/api/v1/group/status",
+				groupCreate: "/api/v1/group/create",
+				groupStop: "/api/v1/group/stop",
+				configMove: "/api/v1/config",
+				configAuto: "/api/v1/config/auto",
+				kvGet: "/api/v1/kv/get",
+				kvPut: "/api/v1/kv/put"
+			};
+
+			const state = {
+				autoBalance: false,
+				isRefreshing: false,
+				refreshTimer: null,
+				dragPayload: null
+			};
+
+			const el = {
+				refreshBtn: document.getElementById("refreshBtn"),
+				autoToggle: document.getElementById("autoToggle"),
+				clusterMeta: document.getElementById("clusterMeta"),
+				clusterList: document.getElementById("clusterList"),
+				clusterMessage: document.getElementById("clusterMessage"),
+				getForm: document.getElementById("getForm"),
+				getKey: document.getElementById("getKey"),
+				getResult: document.getElementById("getResult"),
+				putForm: document.getElementById("putForm"),
+				putKey: document.getElementById("putKey"),
+				putType: document.getElementById("putType"),
+				putValue: document.getElementById("putValue"),
+				putValueHint: document.getElementById("putValueHint"),
+				putVersion: document.getElementById("putVersion"),
+				putResult: document.getElementById("putResult")
+			};
+
+			const numberFmt = new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 1 });
+
+			function escapeHtml(value) {
+				return String(value)
+					.replace(/&/g, "&amp;")
+					.replace(/</g, "&lt;")
+					.replace(/>/g, "&gt;")
+					.replace(/\"/g, "&quot;")
+					.replace(/'/g, "&#39;");
+			}
+
+			async function postJSON(url, payload) {
+				const body = payload === undefined ? {} : payload;
+				const response = await fetch(url, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify(body)
+				});
+
+				let data;
+				try {
+					data = await response.json();
+				} catch (error) {
+					throw new Error("服务端返回了无法解析的响应");
+				}
+
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}`);
+				}
+				if (!data || typeof data !== "object") {
+					throw new Error("服务端响应为空");
+				}
+				if (data.code !== 0) {
+					throw new Error(data.message || `请求失败 code=${data.code}`);
+				}
+				return data;
+			}
+
+			function setClusterMessage(type, message) {
+				el.clusterMessage.className = `message ${type}`;
+				el.clusterMessage.textContent = message;
+			}
+
+			function setResultBox(target, type, html) {
+				target.className = `result ${type}`;
+				target.innerHTML = html;
+			}
+
+			function formatNumber(value) {
+				if (!Number.isFinite(value)) {
+					return "-";
+				}
+				return numberFmt.format(value);
+			}
+
+			function formatDuration(raw) {
+				if (typeof raw === "string") {
+					return raw;
+				}
+				if (typeof raw !== "number" || !Number.isFinite(raw)) {
+					return "-";
+				}
+				const abs = Math.abs(raw);
+				if (abs < 1000) {
+					return `${raw.toFixed(0)} ns`;
+				}
+				if (abs < 1_000_000) {
+					return `${(raw / 1000).toFixed(1)} us`;
+				}
+				if (abs < 1_000_000_000) {
+					return `${(raw / 1_000_000).toFixed(1)} ms`;
+				}
+				return `${(raw / 1_000_000_000).toFixed(2)} s`;
+			}
+
+			function summarizeNodes(nodes) {
+				if (!Array.isArray(nodes) || nodes.length === 0) {
+					return "无节点";
+				}
+				if (nodes.length <= 2) {
+					return nodes.join(" | ");
+				}
+				return `${nodes[0]} | +${nodes.length - 1} 节点`;
+			}
+
+			function getShardsByGroup(shards) {
+				const map = new Map();
+				if (!Array.isArray(shards)) {
+					return map;
+				}
+				for (let shardIndex = 0; shardIndex < shards.length; shardIndex += 1) {
+					const gid = Number(shards[shardIndex]);
+					if (!map.has(gid)) {
+						map.set(gid, []);
+					}
+					map.get(gid).push(shardIndex);
+				}
+				return map;
+			}
+
+			function renderGroupRow(gid, nodes, shards, status) {
+				const nodeCount = Array.isArray(nodes) ? nodes.length : 0;
+				let loadMain = "状态未知";
+				let loadSub = "尚未获取负载";
+
+				if (status && status.ok) {
+					const totalQPS = Number(status.data.total_qps);
+					const doneQPS = Number(status.data.done_qps);
+					const successQPS = Number(status.data.success_qps);
+					const successRate = totalQPS > 0 ? (successQPS / totalQPS) * 100 : 100;
+
+					loadMain = `tps ${formatNumber(totalQPS)}`;
+					loadSub = `done ${formatNumber(doneQPS)} | success ${formatNumber(successRate)}% | avg ${formatDuration(status.data.avg_latency)}`;
+				} else if (status && !status.ok) {
+					loadMain = "状态不可用";
+					loadSub = status.error;
+				}
+
+				const shardItems = Array.isArray(shards) ? shards : [];
+				const shardHtml = shardItems.length
+					? shardItems.map((shardId) => (
+						`<button type="button" class="shard-pill" draggable="true" data-shard="${shardId}" data-from-gid="${gid}" title="拖动分片 S${shardId}">S${shardId}</button>`
+					)).join("")
+					: "<div class=\"shard-zone is-empty\">无分片，可拖入</div>";
+
+				const shardZoneHtml = shardItems.length
+					? `<div class="shard-zone" data-gid="${gid}">${shardHtml}</div>`
+					: `<div class="shard-zone is-empty" data-gid="${gid}">${shardHtml}</div>`;
+
+				const nodeSummary = summarizeNodes(nodes);
+
+				return `
+					<article class="group-row" data-gid="${gid}">
+						<div class="cell">
+							<span class="group-chip">G${gid}</span>
+						</div>
+
+						<div class="cell">
+							<div class="metric-value">${nodeCount}</div>
+							<div class="metric-sub" title="${escapeHtml(Array.isArray(nodes) ? nodes.join(", ") : "")}">${escapeHtml(nodeSummary)}</div>
+						</div>
+
+						<div class="cell">
+							<div class="metric-value">${escapeHtml(loadMain)}</div>
+							<div class="metric-sub" title="${escapeHtml(loadSub)}">${escapeHtml(loadSub)}</div>
+						</div>
+
+						<div class="cell">
+							${shardZoneHtml}
+						</div>
+
+						<div class="cell action-cell">
+							<button type="button" class="danger-btn" data-action="delete-group" data-gid="${gid}">删除</button>
+						</div>
+					</article>
+				`;
+			}
+
+			function renderAddRow() {
+				return `
+					<article class="group-row add-row">
+						<button type="button" class="add-btn" data-action="create-group">+ 新增分片组</button>
+					</article>
+				`;
+			}
+
+			function renderCluster(config, statusMap) {
+				const groups = config.groups || {};
+				const gids = Object.keys(groups)
+					.map((gid) => Number(gid))
+					.filter((gid) => Number.isFinite(gid))
+					.sort((a, b) => a - b);
+				const shardsByGroup = getShardsByGroup(config.shards);
+
+				const rows = gids.map((gid) => renderGroupRow(
+					gid,
+					groups[String(gid)] || groups[gid] || [],
+					shardsByGroup.get(gid) || [],
+					statusMap[gid]
+				));
+				rows.push(renderAddRow());
+				el.clusterList.innerHTML = rows.join("");
+			}
+
+			function setRefreshingUI(loading) {
+				el.refreshBtn.disabled = loading;
+				el.refreshBtn.classList.toggle("is-loading", loading);
+			}
+
+			async function refreshCluster(options = {}) {
+				const announce = options.announce !== false;
+				if (state.isRefreshing) {
+					return;
+				}
+				state.isRefreshing = true;
+				setRefreshingUI(true);
+
+				try {
+					const config = await postJSON(endpoint.groupGet, {});
+					const groups = config.groups || {};
+					const gids = Object.keys(groups)
+						.map((gid) => Number(gid))
+						.filter((gid) => Number.isFinite(gid))
+						.sort((a, b) => a - b);
+
+					const statusPairs = await Promise.all(gids.map(async (gid) => {
+						try {
+							const status = await postJSON(endpoint.groupStatus, { gid: gid });
+							return [gid, { ok: true, data: status }];
+						} catch (error) {
+							return [gid, { ok: false, error: error.message }];
+						}
+					}));
+
+					const statusMap = Object.fromEntries(statusPairs);
+					renderCluster(config, statusMap);
+
+					const now = new Date();
+					el.clusterMeta.textContent = `配置版本 ${config.num} | 分片组 ${gids.length} 个 | ${now.toLocaleString("zh-CN")}`;
+					if (announce) {
+						setClusterMessage("success", "集群信息已刷新。");
+					}
+				} catch (error) {
+					setClusterMessage("error", `刷新失败：${error.message}`);
+				} finally {
+					state.isRefreshing = false;
+					setRefreshingUI(false);
+				}
+			}
+
+			async function createGroup() {
+				try {
+					const result = await postJSON(endpoint.groupCreate, {});
+					setClusterMessage("success", `新增分片组成功，gid=${result.gid}`);
+					await refreshCluster({ announce: false });
+				} catch (error) {
+					setClusterMessage("error", `新增分片组失败：${error.message}`);
+				}
+			}
+
+			async function deleteGroup(gid) {
+				const confirmed = window.confirm(`确认删除分片组 G${gid} 吗？仅当该组不持有分片时才会成功。`);
+				if (!confirmed) {
+					return;
+				}
+				try {
+					await postJSON(endpoint.groupStop, { gid: gid });
+					setClusterMessage("success", `分片组 G${gid} 已删除。`);
+					await refreshCluster({ announce: false });
+				} catch (error) {
+					setClusterMessage("error", `删除分片组失败：${error.message}`);
+				}
+			}
+
+			function clearDropTargets() {
+				const rows = el.clusterList.querySelectorAll(".group-row.drag-target");
+				for (const row of rows) {
+					row.classList.remove("drag-target");
+				}
+			}
+
+			function parseDragPayload(event) {
+				if (state.dragPayload) {
+					return state.dragPayload;
+				}
+				try {
+					const text = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
+					if (!text) {
+						return null;
+					}
+					const payload = JSON.parse(text);
+					if (!Number.isFinite(Number(payload.shard)) || !Number.isFinite(Number(payload.from))) {
+						return null;
+					}
+					return {
+						shard: Number(payload.shard),
+						from: Number(payload.from)
+					};
+				} catch (error) {
+					return null;
+				}
+			}
+
+			async function moveShard(payload, toGid) {
+				if (!payload || !Number.isFinite(payload.shard) || !Number.isFinite(payload.from)) {
+					return;
+				}
+				if (payload.from === toGid) {
+					setClusterMessage("info", `分片 S${payload.shard} 已在 G${toGid}，无需迁移。`);
+					return;
+				}
+
+				try {
+					await postJSON(endpoint.configMove, {
+						shard: payload.shard,
+						from: payload.from,
+						to: toGid
+					});
+					setClusterMessage("success", `分片 S${payload.shard} 已从 G${payload.from} 迁移到 G${toGid}。`);
+					await refreshCluster({ announce: false });
+				} catch (error) {
+					setClusterMessage("error", `分片迁移失败：${error.message}`);
+				}
+			}
+
+			function formatValueDisplay(value) {
+				if (typeof value === "string") {
+					return value;
+				}
+				try {
+					return JSON.stringify(value, null, 2);
+				} catch (error) {
+					return String(value);
+				}
+			}
+
+			function parseTypedValue(type, rawValue) {
+				const value = rawValue.trim();
+				if (value.length === 0) {
+					throw new Error("value 不能为空");
+				}
+
+				if (type === "string") {
+					return value;
+				}
+				if (type === "int") {
+					if (!/^-?\d+$/.test(value)) {
+						throw new Error("int 类型必须是整数");
+					}
+					return Number.parseInt(value, 10);
+				}
+				if (type === "float") {
+					const floatValue = Number(value);
+					if (!Number.isFinite(floatValue)) {
+						throw new Error("float 类型必须是有限数字");
+					}
+					return floatValue;
+				}
+				if (type === "bool") {
+					const lowered = value.toLowerCase();
+					if (lowered === "true" || lowered === "1") {
+						return true;
+					}
+					if (lowered === "false" || lowered === "0") {
+						return false;
+					}
+					throw new Error("bool 类型请填写 true/false 或 1/0");
+				}
+
+				throw new Error(`不支持的 type：${type}`);
+			}
+
+			function parseVersion(rawVersion) {
+				const text = rawVersion.trim();
+				if (text.length === 0) {
+					throw new Error("version 不能为空");
+				}
+				if (!/^\d+$/.test(text)) {
+					throw new Error("version 必须是非负整数");
+				}
+				return Number.parseInt(text, 10);
+			}
+
+			function updatePutValueHint() {
+				const type = el.putType.value;
+				if (type === "string") {
+					el.putValue.placeholder = "例如 hello";
+					el.putValueHint.textContent = "当前类型 string：请输入普通文本。";
+					return;
+				}
+				if (type === "int") {
+					el.putValue.placeholder = "例如 42";
+					el.putValueHint.textContent = "当前类型 int：请输入整数，如 0、-12、99。";
+					return;
+				}
+				if (type === "float") {
+					el.putValue.placeholder = "例如 3.1415";
+					el.putValueHint.textContent = "当前类型 float：请输入浮点数，如 2.5、-0.1。";
+					return;
+				}
+				el.putValue.placeholder = "true 或 false";
+				el.putValueHint.textContent = "当前类型 bool：请输入 true/false 或 1/0。";
+			}
+
+			function bindClusterEvents() {
+				el.refreshBtn.addEventListener("click", () => {
+					refreshCluster();
+				});
+
+				el.autoToggle.addEventListener("change", async () => {
+					const nextValue = el.autoToggle.checked;
+					el.autoToggle.disabled = true;
+					try {
+						await postJSON(endpoint.configAuto, { auto: nextValue });
+						state.autoBalance = nextValue;
+						setClusterMessage("success", `自动负载均衡已${nextValue ? "开启" : "关闭"}。`);
+					} catch (error) {
+						el.autoToggle.checked = !nextValue;
+						setClusterMessage("error", `设置自动均衡失败：${error.message}`);
+					} finally {
+						el.autoToggle.disabled = false;
+					}
+				});
+
+				el.clusterList.addEventListener("click", (event) => {
+					const target = event.target;
+					if (!(target instanceof Element)) {
+						return;
+					}
+					const actionButton = target.closest("[data-action]");
+					if (!actionButton) {
+						return;
+					}
+
+					const action = actionButton.getAttribute("data-action");
+					if (action === "create-group") {
+						createGroup();
+						return;
+					}
+					if (action === "delete-group") {
+						const gid = Number(actionButton.getAttribute("data-gid"));
+						if (Number.isFinite(gid)) {
+							deleteGroup(gid);
+						}
+					}
+				});
+
+				el.clusterList.addEventListener("dragstart", (event) => {
+					const target = event.target;
+					if (!(target instanceof Element)) {
+						return;
+					}
+					const shardPill = target.closest(".shard-pill");
+					if (!shardPill) {
+						return;
+					}
+
+					const shard = Number(shardPill.getAttribute("data-shard"));
+					const from = Number(shardPill.getAttribute("data-from-gid"));
+					if (!Number.isFinite(shard) || !Number.isFinite(from)) {
+						return;
+					}
+
+					state.dragPayload = { shard: shard, from: from };
+					if (event.dataTransfer) {
+						event.dataTransfer.effectAllowed = "move";
+						event.dataTransfer.setData("text/plain", JSON.stringify(state.dragPayload));
+					}
+				});
+
+				el.clusterList.addEventListener("dragend", () => {
+					state.dragPayload = null;
+					clearDropTargets();
+				});
+
+				el.clusterList.addEventListener("dragover", (event) => {
+					const target = event.target;
+					if (!(target instanceof Element)) {
+						return;
+					}
+					const row = target.closest(".group-row[data-gid]");
+					if (!row) {
+						return;
+					}
+					const payload = parseDragPayload(event);
+					if (!payload) {
+						return;
+					}
+					const toGid = Number(row.getAttribute("data-gid"));
+					if (!Number.isFinite(toGid) || payload.from === toGid) {
+						return;
+					}
+
+					event.preventDefault();
+					clearDropTargets();
+					row.classList.add("drag-target");
+					if (event.dataTransfer) {
+						event.dataTransfer.dropEffect = "move";
+					}
+				});
+
+				el.clusterList.addEventListener("dragleave", (event) => {
+					const target = event.target;
+					if (!(target instanceof Element)) {
+						return;
+					}
+					const row = target.closest(".group-row[data-gid]");
+					if (!row) {
+						return;
+					}
+					const related = event.relatedTarget;
+					if (related instanceof Node && row.contains(related)) {
+						return;
+					}
+					row.classList.remove("drag-target");
+				});
+
+				el.clusterList.addEventListener("drop", (event) => {
+					const target = event.target;
+					if (!(target instanceof Element)) {
+						return;
+					}
+					const row = target.closest(".group-row[data-gid]");
+					if (!row) {
+						return;
+					}
+					event.preventDefault();
+
+					const payload = parseDragPayload(event);
+					const toGid = Number(row.getAttribute("data-gid"));
+					clearDropTargets();
+					state.dragPayload = null;
+
+					if (!payload || !Number.isFinite(toGid)) {
+						return;
+					}
+					moveShard(payload, toGid);
+				});
+			}
+
+			function bindDataEvents() {
+				el.putType.addEventListener("change", updatePutValueHint);
+
+				el.getForm.addEventListener("submit", async (event) => {
+					event.preventDefault();
+					const key = el.getKey.value.trim();
+					if (!key) {
+						setResultBox(el.getResult, "error", "Key 不能为空。");
+						return;
+					}
+
+					const submitButton = el.getForm.querySelector("button[type='submit']");
+					submitButton.disabled = true;
+					try {
+						const result = await postJSON(endpoint.kvGet, { key: key });
+						const valueText = escapeHtml(formatValueDisplay(result.value));
+						setResultBox(
+							el.getResult,
+							"success",
+							`
+								<p class="result-title">查询成功</p>
+								<dl class="kv-result">
+									<dt>type</dt><dd>${escapeHtml(result.type)}</dd>
+									<dt>value</dt><dd>${valueText}</dd>
+									<dt>version</dt><dd>${escapeHtml(String(result.version))}</dd>
+								</dl>
+							`
+						);
+					} catch (error) {
+						setResultBox(el.getResult, "error", `查询失败：${escapeHtml(error.message)}`);
+					} finally {
+						submitButton.disabled = false;
+					}
+				});
+
+				el.putForm.addEventListener("submit", async (event) => {
+					event.preventDefault();
+
+					const key = el.putKey.value.trim();
+					const type = el.putType.value;
+					const rawValue = el.putValue.value;
+					const rawVersion = el.putVersion.value;
+
+					if (!key) {
+						setResultBox(el.putResult, "error", "Key 不能为空。");
+						return;
+					}
+					if (!type) {
+						setResultBox(el.putResult, "error", "Type 不能为空。");
+						return;
+					}
+
+					let value;
+					let version;
+					try {
+						value = parseTypedValue(type, rawValue);
+						version = parseVersion(rawVersion);
+					} catch (error) {
+						setResultBox(el.putResult, "error", `参数错误：${escapeHtml(error.message)}`);
+						return;
+					}
+
+					const submitButton = el.putForm.querySelector("button[type='submit']");
+					submitButton.disabled = true;
+
+					try {
+						await postJSON(endpoint.kvPut, {
+							key: key,
+							type: type,
+							value: value,
+							version: version
+						});
+						setResultBox(
+							el.putResult,
+							"success",
+							`写入成功：key=${escapeHtml(key)}，type=${escapeHtml(type)}，version=${escapeHtml(String(version))}`
+						);
+					} catch (error) {
+						setResultBox(el.putResult, "error", `写入失败：${escapeHtml(error.message)}`);
+					} finally {
+						submitButton.disabled = false;
+					}
+				});
+			}
+
+			function startAutoRefresh() {
+				if (state.refreshTimer !== null) {
+					window.clearInterval(state.refreshTimer);
+				}
+				state.refreshTimer = window.setInterval(() => {
+					refreshCluster({ announce: false });
+				}, REFRESH_INTERVAL_MS);
+			}
+
+			function init() {
+				bindClusterEvents();
+				bindDataEvents();
+				updatePutValueHint();
+
+				el.autoToggle.checked = state.autoBalance;
+				startAutoRefresh();
+				refreshCluster({ announce: false });
+
+				document.addEventListener("visibilitychange", () => {
+					if (!document.hidden) {
+						refreshCluster({ announce: false });
+					}
+				});
+			}
+
+			init();
+		})();
+	</script>
+</body>
+</html>

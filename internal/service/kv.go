@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/khyallin/shardkv/api"
 	"github.com/khyallin/shardkv/client"
@@ -12,13 +13,13 @@ import (
 )
 
 type KVService struct {
+	mu     sync.Mutex
 	client *client.Clerk
 }
 
 func NewKVService() *KVService {
-	skv := shardkv.New()
 	return &KVService{
-		client: skv.MakeClient(),
+		client: shardkv.MakeClient(),
 	}
 }
 
@@ -66,6 +67,9 @@ func (s *KVService) checkTypeValue(tv TypeValue) error {
 }
 
 func (s *KVService) Get(key string) (string, json.RawMessage, int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	jsonValue, version, clientErr := s.client.Get(key)
 	if clientErr != api.OK {
 		return "", nil, 0, fmt.Errorf("KVService Get %s: %v", key, clientErr)
@@ -82,6 +86,9 @@ func (s *KVService) Get(key string) (string, json.RawMessage, int, error) {
 }
 
 func (s *KVService) Put(key string, kvtype string, value json.RawMessage, version int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	tv := TypeValue{
 		Type:  kvtype,
 		Value: value,

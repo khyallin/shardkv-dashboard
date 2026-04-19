@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,19 +17,23 @@ import (
 )
 
 type ConfigService struct {
+	mu sync.Mutex
+
 	skv    *shardkv.ShardKV
 	ctrler *controller.Controller
 	client *client.Clerk
 	groups []*shardkv.Group
-	auto   atomic.Int32
+
+	auto atomic.Int32
+	dead atomic.Int32
 }
 
 func NewConfigService() *ConfigService {
 	skv := shardkv.New()
 	s := &ConfigService{
 		skv:    skv,
-		ctrler: skv.MakeCtrler(),
-		client: skv.MakeClient(),
+		ctrler: shardkv.MakeCtrler(),
+		client: shardkv.MakeClient(),
 		groups: make([]*shardkv.Group, 0),
 	}
 	s.setup()
@@ -42,13 +47,16 @@ func (s *ConfigService) setup() {
 	s.skv.RunGroup(group1)
 	s.groups = append(s.groups, group0, group1)
 
-	s.ctrler.InitConfig(s.skv.DefaultConfig())
+	s.ctrler.InitConfig(shardkv.DefaultConfig())
 	go s.ticker()
 }
 
 func (s *ConfigService) ticker() {
 	ticker := time.NewTicker(time.Second * 10)
 	for range ticker.C {
+		if s.dead.Load() == 1 {
+			return
+		}
 		if s.auto.Load() == 0 {
 			continue
 		}
@@ -60,6 +68,14 @@ func (s *ConfigService) ticker() {
 }
 
 func (s *ConfigService) teardown() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.dead.Load() == 1 {
+		return
+	}
+	s.dead.Store(1)
+
 	for _, group := range s.groups {
 		s.skv.StopGroup(group)
 	}
@@ -68,7 +84,10 @@ func (s *ConfigService) teardown() {
 	}
 }
 
-func (s *ConfigService) Get() (int, []int, map[int][]string, error) {
+func (s *ConfigService) GetGroup() (int, []int, map[int][]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	cfg := s.ctrler.Query()
 	shards := make([]int, len(cfg.Shards))
 	for i, gid := range cfg.Shards {
@@ -82,6 +101,9 @@ func (s *ConfigService) Get() (int, []int, map[int][]string, error) {
 }
 
 func (s *ConfigService) CreateGroup() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	gid := config.Tgid(len(s.groups))
 	group := s.skv.MakeGroup(gid)
 	s.skv.RunGroup(group)
@@ -94,21 +116,24 @@ func (s *ConfigService) CreateGroup() (int, error) {
 }
 
 func (s *ConfigService) StopGroup(gid int) error {
-	if gid <= 0 || gid > len(s.groups) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if gid <= 0 || gid >= len(s.groups) {
 		return fmt.Errorf("ConfigService StopGroup: group %d not found", gid)
 	}
 	if s.groups[gid].Status != shardkv.StatusRunning {
 		return fmt.Errorf("ConfigService StopGroup: group %d is not running", gid)
 	}
+	for _, shard := range s.ctrler.Query().Shards {
+		if shard == config.Tgid(gid) {
+			return fmt.Errorf("ConfigService StopGroup: group %d has shard %d", gid, shard)
+		}
+	}
 	s.skv.StopGroup(s.groups[gid])
 
 	cfg := s.ctrler.Query()
 	delete(cfg.Groups, config.Tgid(gid))
-	for i := range cfg.Shards {
-		if cfg.Shards[i] == config.Tgid(gid) {
-			cfg.Shards[i] = config.Gid1
-		}
-	}
 	s.ctrler.ChangeConfigTo(cfg)
 	return nil
 }
@@ -123,14 +148,17 @@ func (s *ConfigService) SetAuto(auto bool) error {
 }
 
 func (s *ConfigService) MoveShard(shard int, from int, to int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	cfg := s.ctrler.Query()
 	if shard < 0 || shard >= config.NShards {
 		return fmt.Errorf("ConfigService MoveShard: shard %d out of range", shard)
 	}
-	if from <= 0 || from > len(s.groups) {
+	if from <= 0 || from >= len(s.groups) {
 		return fmt.Errorf("ConfigService MoveShard: group %d not found", from)
 	}
-	if to <= 0 || to > len(s.groups) {
+	if to <= 0 || to >= len(s.groups) {
 		return fmt.Errorf("ConfigService MoveShard: group %d not found", to)
 	}
 	if from == to {
@@ -157,7 +185,10 @@ type GroupRunningStatus struct {
 }
 
 func (s *ConfigService) GroupStatus(gid int) (float64, float64, float64, time.Duration, time.Duration, error) {
-	if gid <= 0 || gid > len(s.groups) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if gid <= 0 || gid >= len(s.groups) {
 		return 0, 0, 0, 0, 0, fmt.Errorf("ConfigService GetGroupRunningStatus: group %d not found", gid)
 	}
 	if s.groups[gid].Status != shardkv.StatusRunning {
@@ -171,9 +202,12 @@ func (s *ConfigService) GroupStatus(gid int) (float64, float64, float64, time.Du
 }
 
 func (s *ConfigService) Rebalance() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	groups := make(map[int]*GroupRunningStatus)
 	for gid, group := range s.groups {
-		if group.Status != shardkv.StatusRunning {
+		if gid == 0 || group.Status != shardkv.StatusRunning {
 			continue
 		}
 		totalQPS, doneQPS, successQPS, maxLatency, avgLatency, err := s.client.Status(group.ID)

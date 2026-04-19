@@ -10,16 +10,19 @@ func registerRoutes(r *gin.Engine) {
 
 	r.GET("/ping", h.Ping)
 
+	// 静态文件服务
+    r.StaticFile("/", "./web/index.html")
+
 	api := r.Group("/api/v1")
 	{
 		// 获取集群配置信息
-		api.GET("/groups", h.ConfigGet)
+		api.POST("/group/get", h.ConfigGet)
+		// 查询分片组状态
+		api.POST("/group/status", h.GroupStatus)
 		// 新建分片组
 		api.POST("/group/create", h.GroupCreate)
 		// 停止分片组
 		api.POST("/group/stop", h.GroupStop)
-		// 查询分片组状态
-		api.GET("/group/status", h.GroupStatus)
 
 		// 移动分片
 		api.POST("/config", h.ShardMove)
@@ -27,8 +30,8 @@ func registerRoutes(r *gin.Engine) {
 		api.POST("/config/auto", h.ConfigAuto)
 
 		// 查询键值对
-		api.GET("/kv", h.KVGet)
+		api.POST("/kv/get", h.KVGet)
 		// 设置键值对
-		api.POST("/kv", h.KVPut)
+		api.POST("/kv/put", h.KVPut)
 	}
 }

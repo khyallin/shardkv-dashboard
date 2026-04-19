@@ -9,9 +9,8 @@ type ShardKV struct {
 }
 
 const (
-	NServer   = 5
-	NGroup    = 10
-	ImageName = "khyallin/shardkv"
+	NServer   = 3
+	ImageName = "khyal/shardkv"
 )
 
 func New() *ShardKV {

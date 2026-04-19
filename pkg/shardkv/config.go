@@ -4,7 +4,7 @@ import (
 	"github.com/khyallin/shardkv/config"
 )
 
-func (skv *ShardKV) DefaultConfig() *config.Config {
+func DefaultConfig() *config.Config {
 	servers := GetServers(config.Gid1)
 	cfg := config.MakeConfig()
 	cfg.JoinBalance(map[config.Tgid][]string{

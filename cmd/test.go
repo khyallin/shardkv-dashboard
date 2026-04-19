@@ -20,11 +20,11 @@ func test() {
 		skv.RunGroup(group)
 	}
 
-	ctrler := skv.MakeCtrler()
-	config := skv.DefaultConfig()
+	ctrler := shardkv.MakeCtrler()
+	config := shardkv.DefaultConfig()
 	ctrler.InitConfig(config)
 
-	client := skv.MakeClient()
+	client := shardkv.MakeClient()
 	err := client.Put("key", "value", 0)
 	if err != api.OK {
 		log.Printf("Put error: %v", err)

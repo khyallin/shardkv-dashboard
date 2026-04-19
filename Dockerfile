@@ -15,4 +15,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o shardkv-dashboard
 FROM scratch
 
 COPY --from=builder /app/shardkv-dashboard /shardkv-dashboard
+COPY --from=builder /app/web /web
+
 CMD ["/shardkv-dashboard"]

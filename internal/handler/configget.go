@@ -17,7 +17,7 @@ type ConfigGetResponse struct {
 }
 
 func (h *Handler) ConfigGet(c *gin.Context) {
-	req := ConfigGetRequest{}
+	var req ConfigGetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    1,
@@ -25,7 +25,7 @@ func (h *Handler) ConfigGet(c *gin.Context) {
 		})
 		return
 	}
-	num, shards, groups, err := h.configService.Get()
+	num, shards, groups, err := h.configService.GetGroup()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    1,

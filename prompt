@@ -1,27 +1,20 @@
 仓库shardkv是键值数据库的一个节点，仓库shardkv-dashboard是一个前后端分离的、键值数据库的管理系统。
-我要基于shardkv开发shardkv-dashboard，最基本的操作已经封装在package docker和package shardkv，过程中我将使用ai开发。、
+你是这个项目的前端负责人，完成下面的 dashboard:
 
-展示：
-- 集群的每个分片组，每个分片组包含的节点（controller.Controller.Query()获取 config.Config 对象 Groups 值）
-- 每个分片组分配到的分片（controller.Controller.Query()获取 config.Config 对象 Shards 值）
-- 分片组的负载（client.Clerk.Status()获取分片组负载）
+整个dashboard 分为左右两个部分：集群（左，占比大），数据（右，占比小）
+集群：
+一个列表，定时刷新，每个分片组一行，按gid升序排列，展示节点数量、分片组负载、分片信息（拥有的每个分片），以及一个“删除”按钮。
+列表的最下面一行是一个‘+’号长按钮，用于新增一个分片组，风格与上面的每一行保持一致。
+列表的左上角是标题”集群状态“，右上角是一个刷新icon，用于手动刷新；还有一个开关，用于打开自动负载均衡。
+可以拖动分片从一个分片组到另一个分片组。
+数据：
+两个表单，一个 Get 和一个 Put。
+Get表单只接受一个 key，不能为空，点击 Get 后显示 type、value、version 或报错信息.
+Put表单接受key,type,value,version都不能为空，type为一个下拉单选框，可以选择 string, int, float, bool. 点击 Put 后显示成功或报错信息。
 
-操作：
-- 新增、删除分片组（config.Config 对象 Groups 改动, controller.Controller.ChangeConfigTo()修改配置）
-- 手动把分片配置到分片组（config.Config 对象 Shards 改动, controller.Controller.ChangeConfigTo()修改配置）
-- 自动把分片配置到分片组（负载均衡，待设计）
-- 查询键值对（client.Clerk.Get()方法）
-- 新增、删除、修改键值对（client.Clerk.Put()方法）
+附录 后端接口设计：
 
-其他：
-- 前端技术栈暂不确定
-- controller.Controller 是一个短期的控制器，可以不断创建、多个并发调用ChangeConfigTo()、立即销毁。ChangeConfigTo() 会自动处理并发修改配置冲突。
-- 如果只有95%的程度了解这个项目，可以向我提问。
-
-接口设计：
-
-- 获取集群配置信息（封装 controller.Controller.Query()）
-GET /api/v1/groups
+- 获取集群配置信息 POST /api/v1/group/get
 struct Req {}
 struct Resp {
     code    int
@@ -31,8 +24,21 @@ struct Resp {
     groups  map[int][]string
 }
 
-- 新增分片组（封装 controller.Controller.ChangeConfigTo()）
-POST /api/v1/group
+- 查询分片组状态 POST /api/v1/group/status
+struct Req {
+    gid int
+}
+struct Resp {
+    code       int
+	message    string
+	totalQPS   float64
+	doneQPS    float64
+	successQPS float64
+	maxLatency time.Duration
+	avgLatency time.Duration
+}
+
+- 新增分片组 POST /api/v1/group/create
 struct Req {
 }
 struct Resp {
@@ -41,8 +47,7 @@ struct Resp {
     gid     int
 }
 
-- 停止分片组（封装 controller.Controller.ChangeConfigTo()）
-POST /api/v1/group
+- 停止分片组 POST /api/v1/group/stop
 struct Req {
     gid int
 }
@@ -51,8 +56,7 @@ struct Resp {
     message string
 }
 
-- 手动移动分片 (封装 controller.Controller.ChangeConfigTo())
-POST /api/v1/config
+- 手动移动分片 POST /api/v1/config
 struct Req {
     shard int
     from  int
@@ -63,8 +67,7 @@ struct Resp {
     message string
 }
 
-- 自动负载均衡 （待设计）
-POST /api/v1/config/auto
+- 自动负载均衡 POST /api/v1/config/auto
 struct Req {
     auto bool
 }
@@ -73,8 +76,7 @@ struct Resp {
     message string
 }
 
-- 查询键（封装 client.clerk.Get()）
-GET /api/v1/kv
+- 查询键 POST /api/v1/kv/get
 struct Req {
     key string
 }
@@ -86,12 +88,12 @@ struct Resp {
     version int
 }
 
-- 新增/修改键（封装 client.clerk.Put()）
-POST /api/v1/kv
+- 新增/修改键 POST /api/v1/kv/put
 struct Req {
     key     string
     type    string
     value   any
+    version int
 }
 struct Resp {
     code    int

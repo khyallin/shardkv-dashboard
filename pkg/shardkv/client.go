@@ -5,7 +5,7 @@ import (
 	"github.com/khyallin/shardkv/config"
 )
 
-func (skv *ShardKV) MakeClient() *client.Clerk {
+func MakeClient() *client.Clerk {
 	servers := GetServers(config.Gid0)
 	return client.MakeClerk(servers)
 }

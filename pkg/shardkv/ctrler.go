@@ -5,7 +5,7 @@ import (
 	"github.com/khyallin/shardkv/controller"
 )
 
-func (skv *ShardKV) MakeCtrler() *controller.Controller {
+func MakeCtrler() *controller.Controller {
 	servers := GetServers(config.Gid0)
 	return controller.MakeController(servers)
 }
