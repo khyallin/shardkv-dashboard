@@ -11,7 +11,7 @@ func registerRoutes(r *gin.Engine) {
 	r.GET("/ping", h.Ping)
 
 	// 静态文件服务
-    r.StaticFile("/", "./web/index.html")
+	r.StaticFile("/", "./web/index.html")
 
 	api := r.Group("/api/v1")
 	{
@@ -33,5 +33,8 @@ func registerRoutes(r *gin.Engine) {
 		api.POST("/kv/get", h.KVGet)
 		// 设置键值对
 		api.POST("/kv/put", h.KVPut)
+
+		// 运行压测
+		api.POST("/stress/run", h.StressRun)
 	}
 }

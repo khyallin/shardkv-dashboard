@@ -99,3 +99,56 @@ struct Resp {
     code    int
     message string
 }
+
+- 运行压测 POST /api/v1/stress/run
+struct Req {
+    duration_sec int
+    concurrency  int
+    read_ratio   int
+    value_size   int
+    target_gid   int
+    key_prefix   string
+}
+struct Resp {
+    code       int
+    message    string
+    result     {
+        duration_sec float64
+        concurrency  int
+        read_ratio   int
+        value_size   int
+        target_gid   int
+        key_prefix   string
+        total_ops    int64
+        success_ops  int64
+        failed_ops   int64
+        read_ops     int64
+        write_ops    int64
+        tps          float64
+        success_tps  float64
+        avg_latency  time.Duration
+        max_latency  time.Duration
+        errors       {
+            wrong_leader int64
+            wrong_group  int64
+            version_error int64
+            other         int64
+        }
+        before_status {
+            total_qps   float64
+            done_qps    float64
+            success_qps float64
+            max_latency time.Duration
+            avg_latency time.Duration
+            err         string
+        }
+        after_status {
+            total_qps   float64
+            done_qps    float64
+            success_qps float64
+            max_latency time.Duration
+            avg_latency time.Duration
+            err         string
+        }
+    }
+}

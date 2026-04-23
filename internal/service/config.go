@@ -62,7 +62,7 @@ func (s *ConfigService) ticker() {
 		}
 		err := s.Rebalance()
 		if err != nil {
-			log.Fatalf(err.Error())
+			log.Fatalf("%v", err)
 		}
 	}
 }

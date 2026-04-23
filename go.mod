@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/gin-gonic/gin v1.12.0
-	github.com/khyallin/shardkv v0.0.0-20260417061100-953c706f369a
+	github.com/khyallin/shardkv v0.0.0-20260423044705-412950b39ab2
 	github.com/moby/moby/api v1.52.0
 	github.com/moby/moby/client v0.2.1
 )
