@@ -1,11 +1,8 @@
 package service
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net"
-	gorpc "net/rpc"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -14,7 +11,6 @@ import (
 	"github.com/khyallin/shardkv/api"
 	"github.com/khyallin/shardkv/client"
 	"github.com/khyallin/shardkv/config"
-	"github.com/khyallin/shardkv/controller"
 
 	"github.com/khyallin/shardkv-dashboard/pkg/shardkv"
 )
@@ -22,6 +18,7 @@ import (
 const (
 	stressErrWrongLeader = api.Err("ErrWrongLeader")
 	stressErrWrongGroup  = api.Err("ErrWrongGroup")
+	stressKeyPoolLimit   = 64
 )
 
 type StressRunConfig struct {
@@ -104,10 +101,8 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 		s.mu.Unlock()
 	}()
 
-	clusterCfg, err := s.loadCurrentConfig()
-	if err != nil {
-		return nil, err
-	}
+	ck := client.MakeClerk(s.ctrlerServers)
+	clusterCfg := shardkv.DefaultConfig()
 
 	targetGID := config.Tgid(cfg.TargetGID)
 	targetServers, ok := clusterCfg.Groups[targetGID]
@@ -118,16 +113,17 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 		return nil, fmt.Errorf("stress precheck: target_gid=%d has no shard", cfg.TargetGID)
 	}
 
-	beforeStatus, err := probeGroupStatus(targetServers, 2*time.Second)
+	beforeStatus, err := probeGroupStatus(ck, targetGID)
 	if err != nil {
 		return nil, fmt.Errorf("stress precheck: target_gid=%d unavailable: %w", cfg.TargetGID, err)
 	}
 
-	keyPool := &stressKeyPool{keys: make([]string, 0, 1024)}
+	keyPool := &stressKeyPool{keys: make([]string, 0, stressKeyPoolLimit)}
+	if err := bootstrapStressKeyPool(ck, keyPool, cfg.KeyPrefix, targetGID, clusterCfg); err != nil {
+		return nil, fmt.Errorf("stress bootstrap: %w", err)
+	}
 	counters := &stressCounters{}
 	value := strings.Repeat("x", cfg.ValueSize)
-
-	var putSeq uint64
 	var wg sync.WaitGroup
 	startAt := time.Now()
 	deadline := startAt.Add(cfg.Duration)
@@ -137,7 +133,7 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 		go func(id int) {
 			defer wg.Done()
 
-			ck := client.MakeClerk(s.ctrlerServers)
+			workerCk := client.MakeClerk(s.ctrlerServers)
 			rng := rand.New(rand.NewSource(time.Now().UnixNano() + int64(id+1)*7919))
 
 			for time.Now().Before(deadline) {
@@ -146,20 +142,24 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 					key, ok := keyPool.Random(rng)
 					if ok {
 						opStart := time.Now()
-						_, _, err := ck.Get(key)
+						_, _, err := workerCk.Get(key)
 						counters.Observe(true, err, time.Since(opStart))
 						continue
 					}
 				}
 
-				seq := atomic.AddUint64(&putSeq, 1) - 1
-				key := keyForTargetGID(cfg.KeyPrefix, seq, targetGID, clusterCfg)
-				opStart := time.Now()
-				err := ck.Put(key, value, 0)
-				counters.Observe(false, err, time.Since(opStart))
-				if err == api.OK {
-					keyPool.Add(key)
+				key, ok := keyPool.Random(rng)
+				if !ok {
+					continue
 				}
+				_, version, getErr := workerCk.Get(key)
+				if getErr != api.OK {
+					counters.Observe(false, getErr, 0)
+					continue
+				}
+				opStart := time.Now()
+				err := workerCk.Put(key, value, version)
+				counters.Observe(false, err, time.Since(opStart))
 			}
 		}(workerID)
 	}
@@ -167,7 +167,7 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 	wg.Wait()
 	elapsed := time.Since(startAt)
 
-	afterStatus, statusErr := probeGroupStatus(targetServers, 2*time.Second)
+	afterStatus, statusErr := probeGroupStatus(ck, targetGID)
 	if statusErr != nil {
 		afterStatus.Err = statusErr.Error()
 	}
@@ -200,26 +200,6 @@ func validateStressRunConfig(cfg StressRunConfig) error {
 	return nil
 }
 
-func (s *StressService) loadCurrentConfig() (*config.Config, error) {
-	ctrler := controller.MakeController(s.ctrlerServers)
-	value, _, err := ctrler.Get("config")
-	if err != api.OK {
-		return nil, fmt.Errorf("stress precheck: controller unavailable: %v", err)
-	}
-	if value == "" {
-		return nil, fmt.Errorf("stress precheck: empty config from controller")
-	}
-
-	var cfg config.Config
-	if err := json.Unmarshal([]byte(value), &cfg); err != nil {
-		return nil, fmt.Errorf("stress precheck: decode config: %v", err)
-	}
-	if cfg.Groups == nil {
-		return nil, fmt.Errorf("stress precheck: invalid config from controller")
-	}
-	return &cfg, nil
-}
-
 func groupOwnsAnyShard(cfg *config.Config, gid config.Tgid) bool {
 	for _, owner := range cfg.Shards {
 		if owner == gid {
@@ -243,47 +223,39 @@ func keyForTargetGID(prefix string, seq uint64, gid config.Tgid, cfg *config.Con
 	return key
 }
 
-func probeGroupStatus(servers []string, timeout time.Duration) (StressGroupStatus, error) {
-	var lastErr error
-	for _, server := range servers {
-		reply, err := callGroupStatus(server, timeout)
-		if err != nil {
-			lastErr = err
-			continue
+func bootstrapStressKeyPool(ck *client.Clerk, keyPool *stressKeyPool, prefix string, gid config.Tgid, cfg *config.Config) error {
+	for seq := 0; keyPool.Len() < stressKeyPoolLimit; seq++ {
+		key := keyForTargetGID(prefix, uint64(seq), gid, cfg)
+		_, version, err := ck.Get(key)
+		switch err {
+		case api.OK:
+			keyPool.Add(key)
+		case api.ErrNoKey:
+			if putErr := ck.Put(key, "", 0); putErr != api.OK {
+				return fmt.Errorf("seed put %s: %v", key, putErr)
+			}
+			keyPool.Add(key)
+			_ = version
+		default:
+			return fmt.Errorf("seed get %s: %v", key, err)
 		}
-		if reply.Err == api.OK {
-			return StressGroupStatus{
-				TotalQPS:   reply.TotalQPS,
-				DoneQPS:    reply.DoneQPS,
-				SuccessQPS: reply.SuccessQPS,
-				MaxLatency: reply.MaxLatency,
-				AvgLatency: reply.AvgLatency,
-			}, nil
-		}
-		lastErr = fmt.Errorf("%s status error: %v", server, reply.Err)
 	}
-
-	if lastErr == nil {
-		lastErr = fmt.Errorf("no reachable server")
-	}
-	return StressGroupStatus{Err: lastErr.Error()}, lastErr
+	return nil
 }
 
-func callGroupStatus(server string, timeout time.Duration) (*api.StatusReply, error) {
-	conn, err := net.DialTimeout("tcp", server+config.Port, timeout)
-	if err != nil {
-		return nil, fmt.Errorf("dial %s: %v", server, err)
+func probeGroupStatus(ck *client.Clerk, gid config.Tgid) (StressGroupStatus, error) {
+	totalQps, doneQps, successQps, maxLatency, avgLatency, err := ck.Status(gid)
+	if err == api.OK {
+		return StressGroupStatus{
+			TotalQPS:   totalQps,
+			DoneQPS:    doneQps,
+			SuccessQPS: successQps,
+			MaxLatency: maxLatency,
+			AvgLatency: avgLatency,
+		}, nil
 	}
-	_ = conn.SetDeadline(time.Now().Add(timeout))
 
-	rpcClient := gorpc.NewClient(conn)
-	defer rpcClient.Close()
-
-	reply := &api.StatusReply{}
-	if err := rpcClient.Call("KVServer.Status", &api.StatusArgs{}, reply); err != nil {
-		return nil, fmt.Errorf("call %s: %v", server, err)
-	}
-	return reply, nil
+	return StressGroupStatus{Err: string(err)}, fmt.Errorf("status error: %v", err)
 }
 
 type stressKeyPool struct {
@@ -295,6 +267,12 @@ func (p *stressKeyPool) Add(key string) {
 	p.mu.Lock()
 	p.keys = append(p.keys, key)
 	p.mu.Unlock()
+}
+
+func (p *stressKeyPool) Len() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return len(p.keys)
 }
 
 func (p *stressKeyPool) Random(rng *rand.Rand) (string, bool) {
