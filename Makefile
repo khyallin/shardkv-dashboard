@@ -34,7 +34,9 @@ clear:
 
 debug: build run
 
-restart: clear debug
+restart: clear build run
+
+all: init build run
 
 stress-precheck:
 	curl --noproxy '*' -fsS $(BASE)/ping >/dev/null
