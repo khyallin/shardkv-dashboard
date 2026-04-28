@@ -3,7 +3,6 @@ package service
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,16 +12,18 @@ import (
 	"github.com/khyallin/shardkv/config"
 	"github.com/khyallin/shardkv/controller"
 
+	"github.com/khyallin/shardkv-dashboard/pkg/rebalance"
 	"github.com/khyallin/shardkv-dashboard/pkg/shardkv"
 )
 
 type ConfigService struct {
 	mu sync.Mutex
 
-	skv    *shardkv.ShardKV
-	ctrler *controller.Controller
-	client *client.Clerk
-	groups []*shardkv.Group
+	skv        *shardkv.ShardKV
+	ctrler     *controller.Controller
+	client     *client.Clerk
+	groups     []*shardkv.Group
+	rebalancer rebalance.Rebalancer
 
 	auto atomic.Int32
 	dead atomic.Int32
@@ -31,10 +32,11 @@ type ConfigService struct {
 func NewConfigService() *ConfigService {
 	skv := shardkv.New()
 	s := &ConfigService{
-		skv:    skv,
-		ctrler: shardkv.MakeCtrler(),
-		client: shardkv.MakeClient(),
-		groups: make([]*shardkv.Group, 0),
+		skv:        skv,
+		ctrler:     shardkv.MakeCtrler(),
+		client:     shardkv.MakeClient(),
+		groups:     make([]*shardkv.Group, 0),
+		rebalancer: rebalance.New(),
 	}
 	s.setup()
 	return s
@@ -60,6 +62,7 @@ func (s *ConfigService) ticker() {
 		if s.auto.Load() == 0 {
 			continue
 		}
+
 		err := s.Rebalance()
 		if err != nil {
 			log.Printf("ConfigService Rebalance err: %v", err)
@@ -175,15 +178,6 @@ func (s *ConfigService) MoveShard(shard int, from int, to int) error {
 	return nil
 }
 
-type GroupRunningStatus struct {
-	ID         int
-	TotalQPS   float64
-	DoneQPS    float64
-	SuccessQPS float64
-	MaxLatency time.Duration
-	AvgLatency time.Duration
-}
-
 func (s *ConfigService) GroupStatus(gid int) (float64, float64, float64, time.Duration, time.Duration, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -205,7 +199,7 @@ func (s *ConfigService) Rebalance() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	groups := make(map[int]*GroupRunningStatus)
+	groups := make(map[int]*rebalance.GroupRunningStatus)
 	for gid, group := range s.groups {
 		if gid == 0 || group.Status != shardkv.StatusRunning {
 			continue
@@ -214,7 +208,7 @@ func (s *ConfigService) Rebalance() error {
 		if err != api.OK {
 			return fmt.Errorf("ConfigService Rebalance: group %d status error: %v", gid, err)
 		}
-		groups[gid] = &GroupRunningStatus{
+		groups[gid] = &rebalance.GroupRunningStatus{
 			ID:         gid,
 			TotalQPS:   totalQPS,
 			DoneQPS:    doneQPS,
@@ -223,31 +217,8 @@ func (s *ConfigService) Rebalance() error {
 			AvgLatency: avgLatency,
 		}
 	}
-
 	cfg := s.ctrler.Query()
-	minqps, mingid, maxqps, maxgid := 1e8, -1, -1.0, -1
-	for gid, status := range groups {
-		if minqps < 0 || status.TotalQPS < minqps {
-			minqps = status.TotalQPS
-			mingid = gid
-		}
-		if maxqps < 0 || status.TotalQPS > maxqps {
-			maxqps = status.TotalQPS
-			maxgid = gid
-		}
-	}
-	if mingid == maxgid {
-		return nil
-	}
-	var shards []int
-	for shard, gid := range cfg.Shards {
-		if gid == config.Tgid(maxgid) {
-			shards = append(shards, shard)
-		}
-	}
-
-	move := shards[rand.Intn(len(shards))]
-	cfg.Shards[move] = config.Tgid(mingid)
+	s.rebalancer.Rebalance(cfg, groups)
 	s.ctrler.ChangeConfigTo(cfg)
 	return nil
 }
