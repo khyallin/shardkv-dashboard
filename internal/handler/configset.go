@@ -6,17 +6,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type ConfigAutoRequest struct {
-	Auto bool `json:"auto"`
+type ConfigSetRequest struct {
+	Auto bool   `json:"auto"`
+	Mode string `json:"mode"`
 }
 
-type ConfigAutoResponse struct {
+type ConfigSetResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
-func (h *Handler) ConfigAuto(c *gin.Context) {
-	var req ConfigAutoRequest
+func (h *Handler) ConfigSet(c *gin.Context) {
+	var req ConfigSetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    1,
@@ -24,6 +25,7 @@ func (h *Handler) ConfigAuto(c *gin.Context) {
 		})
 		return
 	}
+
 	err := h.configService.SetAuto(req.Auto)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -32,7 +34,17 @@ func (h *Handler) ConfigAuto(c *gin.Context) {
 		})
 		return
 	}
-	resp := ConfigAutoResponse{
+	if req.Mode != "" {
+		err = h.configService.SetMode(req.Mode)
+	}
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"code":    1,
+			"message": err.Error(),
+		})
+		return
+	}
+	resp := ConfigSetResponse{
 		Code:    0,
 		Message: "OK",
 	}

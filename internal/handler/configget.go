@@ -9,11 +9,10 @@ import (
 type ConfigGetRequest struct{}
 
 type ConfigGetResponse struct {
-	Code    int              `json:"code"`
-	Message string           `json:"message"`
-	Num     int              `json:"num"`
-	Shards  []int            `json:"shards"`
-	Groups  map[int][]string `json:"groups"`
+	Code int       `json:"code"`
+	Message string `json:"message"`
+	Auto bool      `json:"auto"`
+	Mode string    `json:"mode"`
 }
 
 func (h *Handler) ConfigGet(c *gin.Context) {
@@ -25,7 +24,7 @@ func (h *Handler) ConfigGet(c *gin.Context) {
 		})
 		return
 	}
-	num, shards, groups, err := h.configService.GetGroup()
+	auto, mode, err := h.configService.GetConfig()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"code":    1,
@@ -36,9 +35,8 @@ func (h *Handler) ConfigGet(c *gin.Context) {
 	resp := ConfigGetResponse{
 		Code:    0,
 		Message: "OK",
-		Num:     num,
-		Shards:  shards,
-		Groups:  groups,
+		Auto: auto,
+		Mode: mode,
 	}
 	c.JSON(http.StatusOK, resp)
 }

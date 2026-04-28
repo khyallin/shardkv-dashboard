@@ -67,13 +67,23 @@ struct Resp {
     message string
 }
 
-- 自动负载均衡 POST /api/v1/config/auto
+- 设置自动负载均衡 POST /api/v1/config/set
 struct Req {
     auto bool
+    mode string
 }
 struct Resp {
     code    int
     message string
+}
+
+- 获取负载均衡算法 POST /api/v1/config/get
+struct Req {}
+struct Resp {
+    code    int
+    message string
+    auto    bool
+    mode    string
 }
 
 - 查询键 POST /api/v1/kv/get
@@ -152,3 +162,8 @@ struct Resp {
         }
     }
 }
+
+实现一个 scripts/rebalance.sh，比较 pkg/rebalance 中的四种不同负载均衡算法（null，num，qps，multidim）效果。
+实现细节：
+参考 stress.sh 的实现，通过makefile开始，调用 /stress/run 测试，把结果输出到 tmp 下的 rebalance_results.jsonl方便绘图。
+每个测试点通过 make restart 启动，启动成功后等待五秒数据库就绪（建立raft共识），然后开始测试，

@@ -16,7 +16,7 @@ func registerRoutes(r *gin.Engine) {
 	api := r.Group("/api/v1")
 	{
 		// 获取集群配置信息
-		api.POST("/group/get", h.ConfigGet)
+		api.POST("/group/get", h.GroupGet)
 		// 查询分片组状态
 		api.POST("/group/status", h.GroupStatus)
 		// 新建分片组
@@ -27,7 +27,9 @@ func registerRoutes(r *gin.Engine) {
 		// 移动分片
 		api.POST("/config", h.ShardMove)
 		// 设置自动负载均衡
-		api.POST("/config/auto", h.ConfigAuto)
+		api.POST("/config/get", h.ConfigGet)
+		// 获取负载均衡算法
+		api.POST("/config/set", h.ConfigSet)
 
 		// 查询键值对
 		api.POST("/kv/get", h.KVGet)

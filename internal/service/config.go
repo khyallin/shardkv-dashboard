@@ -42,6 +42,67 @@ func NewConfigService() *ConfigService {
 	return s
 }
 
+func (s *ConfigService) GetConfig() (bool, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	auto := s.auto.Load() == 1
+	mode := "default"
+	switch s.rebalancer.(type) {
+	case *rebalance.NullRebalancer:
+		mode = "null"
+	case *rebalance.NumRebalancer:
+		mode = "num"
+	case *rebalance.QpsRebalancer:
+		mode = "qps"
+	case *rebalance.LatencyAwareRebalancer:
+		mode = "latency"
+	case *rebalance.SuccessAwareRebalancer:
+		mode = "success"
+	case *rebalance.GradualRebalancer:
+		mode = "gradual"
+	case *rebalance.MultiDimensionRebalancer:
+		mode = "multidim"
+	default:
+		return false, "", fmt.Errorf("ConfigService Mode Error %T", s.rebalancer)
+	}
+	return auto, mode, nil
+}
+
+func (s *ConfigService) SetAuto(auto bool) error {
+	if auto {
+		s.auto.Store(1)
+	} else {
+		s.auto.Store(0)
+	}
+	return nil
+}
+
+func (s *ConfigService) SetMode(mode string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	switch mode {
+	case "null":
+		s.rebalancer = &rebalance.NullRebalancer{}
+	case "num":
+		s.rebalancer = &rebalance.NumRebalancer{}
+	case "qps":
+		s.rebalancer = &rebalance.QpsRebalancer{}
+	case "latency":
+		s.rebalancer = &rebalance.LatencyAwareRebalancer{}
+	case "success":
+		s.rebalancer = &rebalance.SuccessAwareRebalancer{}
+	case "gradual":
+		s.rebalancer = &rebalance.GradualRebalancer{}
+	case "default", "multidim":
+		s.rebalancer = rebalance.New()
+	default:
+		return fmt.Errorf("ConfigService SetMode: mode %s not supported", mode)
+	}
+	return nil
+}
+
 func (s *ConfigService) setup() {
 	group0 := s.skv.MakeGroup(config.Gid0)
 	s.skv.RunGroup(group0)
@@ -138,15 +199,6 @@ func (s *ConfigService) StopGroup(gid int) error {
 	cfg := s.ctrler.Query()
 	delete(cfg.Groups, config.Tgid(gid))
 	s.ctrler.ChangeConfigTo(cfg)
-	return nil
-}
-
-func (s *ConfigService) SetAuto(auto bool) error {
-	if auto {
-		s.auto.Store(1)
-	} else {
-		s.auto.Store(0)
-	}
 	return nil
 }
 
