@@ -105,21 +105,26 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 	clusterCfg := shardkv.DefaultConfig()
 
 	targetGID := config.Tgid(cfg.TargetGID)
-	targetServers, ok := clusterCfg.Groups[targetGID]
-	if !ok || len(targetServers) == 0 {
-		return nil, fmt.Errorf("stress precheck: target_gid=%d not found", cfg.TargetGID)
-	}
-	if !groupOwnsAnyShard(clusterCfg, targetGID) {
-		return nil, fmt.Errorf("stress precheck: target_gid=%d has no shard", cfg.TargetGID)
-	}
+	targetAny := cfg.TargetGID <= 0
+	var beforeStatus StressGroupStatus
+	if !targetAny {
+		targetServers, ok := clusterCfg.Groups[targetGID]
+		if !ok || len(targetServers) == 0 {
+			return nil, fmt.Errorf("stress precheck: target_gid=%d not found", cfg.TargetGID)
+		}
+		if !groupOwnsAnyShard(clusterCfg, targetGID) {
+			return nil, fmt.Errorf("stress precheck: target_gid=%d has no shard", cfg.TargetGID)
+		}
 
-	beforeStatus, err := probeGroupStatus(ck, targetGID)
-	if err != nil {
-		return nil, fmt.Errorf("stress precheck: target_gid=%d unavailable: %w", cfg.TargetGID, err)
+		var err error
+		beforeStatus, err = probeGroupStatus(ck, targetGID)
+		if err != nil {
+			return nil, fmt.Errorf("stress precheck: target_gid=%d unavailable: %w", cfg.TargetGID, err)
+		}
 	}
 
 	keyPool := &stressKeyPool{keys: make([]string, 0, stressKeyPoolLimit)}
-	if err := bootstrapStressKeyPool(ck, keyPool, cfg.KeyPrefix, targetGID, clusterCfg); err != nil {
+	if err := bootstrapStressKeyPool(ck, keyPool, cfg.KeyPrefix, targetGID, targetAny, clusterCfg); err != nil {
 		return nil, fmt.Errorf("stress bootstrap: %w", err)
 	}
 	counters := &stressCounters{}
@@ -167,9 +172,13 @@ func (s *StressService) Run(cfg StressRunConfig) (*StressResult, error) {
 	wg.Wait()
 	elapsed := time.Since(startAt)
 
-	afterStatus, statusErr := probeGroupStatus(ck, targetGID)
-	if statusErr != nil {
-		afterStatus.Err = statusErr.Error()
+	var afterStatus StressGroupStatus
+	if !targetAny {
+		statusErr := error(nil)
+		afterStatus, statusErr = probeGroupStatus(ck, targetGID)
+		if statusErr != nil {
+			afterStatus.Err = statusErr.Error()
+		}
 	}
 
 	result := counters.BuildResult(cfg, elapsed)
@@ -191,8 +200,8 @@ func validateStressRunConfig(cfg StressRunConfig) error {
 	if cfg.ValueSize < 1 || cfg.ValueSize > 1024*1024 {
 		return fmt.Errorf("value_size must be in [1,1048576]")
 	}
-	if cfg.TargetGID <= 0 {
-		return fmt.Errorf("target_gid must be > 0")
+	if cfg.TargetGID < 0 {
+		return fmt.Errorf("target_gid must be >= 0")
 	}
 	if strings.TrimSpace(cfg.KeyPrefix) == "" {
 		return fmt.Errorf("key_prefix cannot be empty")
@@ -223,9 +232,14 @@ func keyForTargetGID(prefix string, seq uint64, gid config.Tgid, cfg *config.Con
 	return key
 }
 
-func bootstrapStressKeyPool(ck *client.Clerk, keyPool *stressKeyPool, prefix string, gid config.Tgid, cfg *config.Config) error {
+func bootstrapStressKeyPool(ck *client.Clerk, keyPool *stressKeyPool, prefix string, gid config.Tgid, targetAny bool, cfg *config.Config) error {
 	for seq := 0; keyPool.Len() < stressKeyPoolLimit; seq++ {
-		key := keyForTargetGID(prefix, uint64(seq), gid, cfg)
+		key := ""
+		if targetAny {
+			key = fmt.Sprintf("%s%d", prefix, seq)
+		} else {
+			key = keyForTargetGID(prefix, uint64(seq), gid, cfg)
+		}
 		_, version, err := ck.Get(key)
 		switch err {
 		case api.OK:

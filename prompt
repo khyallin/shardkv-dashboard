@@ -162,8 +162,3 @@ struct Resp {
         }
     }
 }
-
-实现一个 scripts/rebalance.sh，比较 pkg/rebalance 中的四种不同负载均衡算法（null，num，qps，multidim）效果。
-实现细节：
-参考 stress.sh 的实现，通过makefile开始，调用 /stress/run 测试，把结果输出到 tmp 下的 rebalance_results.jsonl方便绘图。
-每个测试点通过 make restart 启动，启动成功后等待五秒数据库就绪（建立raft共识），然后开始测试，

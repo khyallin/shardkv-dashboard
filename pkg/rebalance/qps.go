@@ -31,6 +31,11 @@ func (QpsRebalancer) Rebalance(cfg *config.Config, groups map[int]*GroupRunningS
 		}
 	}
 
+	// 防御：当 maxgid 组没有任何分片时，避免 rand.Intn(0) panic。
+	if len(shards) == 0 {
+		return nil
+	}
+
 	move := shards[rand.Intn(len(shards))]
 	cfg.Shards[move] = config.Tgid(mingid)
 	return nil

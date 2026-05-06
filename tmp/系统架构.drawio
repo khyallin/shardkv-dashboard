@@ -1,0 +1,86 @@
+<mxfile host="Electron" agent="Cursor">
+  <diagram id="shardkv-dashboard-arch" name="ShardKV Dashboard architecture">
+    <mxGraphModel dx="1134" dy="736" grid="0" gridSize="10" guides="1" tooltips="0" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="layer_web" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8EEF5;strokeColor=#2E4A62;strokeWidth=1;fontFamily=Helvetica;fontSize=10;align=center;verticalAlign=middle;fontColor=#1a1a1a;" value="前端层" vertex="1">
+          <mxGeometry height="68" width="610" x="295" y="166" as="geometry" />
+        </mxCell>
+        <mxCell id="yvC4kj-mv3X1JVTNa-zt-1" edge="1" parent="1" source="layer_api" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="svc_kv" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layer_api" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E4F0E8;strokeColor=#2D5A3D;strokeWidth=1;fontFamily=Helvetica;fontSize=10;align=center;verticalAlign=middle;fontColor=#1a1a1a;" value="API 层&lt;br&gt;Router &amp;amp; Handler" vertex="1">
+          <mxGeometry height="79" width="610" x="294" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_cfg" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EDE8F5;strokeColor=#4A3D6B;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;fontColor=#1a1a1a;" value="ConfigService&#xa;分片组管理 / 迁移 / 自动均衡" vertex="1">
+          <mxGeometry height="110" width="190" x="294" y="368" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_kv" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EDE8F5;strokeColor=#4A3D6B;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;fontColor=#1a1a1a;" value="KVService&lt;br&gt;类型校验 + 版本控制" vertex="1">
+          <mxGeometry height="110" width="190" x="504" y="368" as="geometry" />
+        </mxCell>
+        <mxCell id="svc_stress" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#EDE8F5;strokeColor=#4A3D6B;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;fontColor=#1a1a1a;" value="StressService&lt;br&gt;并发压测 / 指标统计" vertex="1">
+          <mxGeometry height="110" width="190" x="714" y="368" as="geometry" />
+        </mxCell>
+        <mxCell id="layer_adapter" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF4E5;strokeColor=#8B5A2B;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;fontColor=#1a1a1a;" value="适配层&lt;br&gt;shardkv + docker" vertex="1">
+          <mxGeometry height="95" width="610" x="295" y="513" as="geometry" />
+        </mxCell>
+        <mxCell id="box_cluster" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ECECEC;strokeColor=#555555;strokeWidth=1.5;fontFamily=Helvetica;" value="" vertex="1">
+          <mxGeometry height="100" width="612" x="292" y="643" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_cluster" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontFamily=Helvetica;fontSize=10;fontStyle=2;fontColor=#444444;" value="被管理 ShardKV 集群" vertex="1">
+          <mxGeometry height="20" width="180" x="295" y="646" as="geometry" />
+        </mxCell>
+        <mxCell id="n_ctrl" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;" value="Meta Group&lt;br&gt;(GID 0)" vertex="1">
+          <mxGeometry height="54" width="180" x="324" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="n_group1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;" value="Shard Group 1&#xa;(GID 1)" vertex="1">
+          <mxGeometry height="54" width="180" x="510" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="n_groupn" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;strokeWidth=1;fontFamily=Helvetica;fontSize=9;align=center;verticalAlign=middle;" value="Shard Group N ...&lt;br&gt;(GID &amp;gt;= 2)" vertex="1">
+          <mxGeometry height="54" width="180" x="699" y="675" as="geometry" />
+        </mxCell>
+        <mxCell id="e_web_api" edge="1" parent="1" source="layer_web" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.5;strokeColor=#2E4A62;edgeStyle=orthogonalEdgeStyle;labelBackgroundColor=#FFFFFF;" target="layer_api" value="JSON API 请求">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_api_cfg" edge="1" parent="1" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.2;strokeColor=#4A3D6B;edgeStyle=orthogonalEdgeStyle;" target="svc_cfg" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="599" y="354" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_kv" edge="1" parent="1" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.2;strokeColor=#4A3D6B;edgeStyle=orthogonalEdgeStyle;" target="svc_kv" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="599" y="354" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_api_stress" edge="1" parent="1" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.2;strokeColor=#4A3D6B;edgeStyle=orthogonalEdgeStyle;" target="svc_stress" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="599" y="354" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_cfg_adapter" edge="1" parent="1" source="svc_cfg" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.2;strokeColor=#8B5A2B;edgeStyle=orthogonalEdgeStyle;entryX=0.154;entryY=0.048;entryDx=0;entryDy=0;entryPerimeter=0;" target="layer_adapter" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_kv_adapter" edge="1" parent="1" source="svc_kv" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.2;strokeColor=#8B5A2B;edgeStyle=orthogonalEdgeStyle;" target="layer_adapter" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_stress_adapter" edge="1" parent="1" source="svc_stress" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.2;strokeColor=#8B5A2B;edgeStyle=orthogonalEdgeStyle;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="808" y="519" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_adapter_cluster" edge="1" parent="1" source="layer_adapter" style="endArrow=block;html=1;fontFamily=Helvetica;fontSize=8;strokeWidth=1.5;strokeColor=#555555;edgeStyle=orthogonalEdgeStyle;labelBackgroundColor=#FFFFFF;" target="n_group1" value="Network">
+          <mxGeometry relative="1" x="0.0149" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_adapter_ctrl" edge="1" parent="1" source="layer_adapter" style="endArrow=classic;html=1;rounded=0;strokeColor=#777777;strokeWidth=1;" target="n_ctrl" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_adapter_groupn" edge="1" parent="1" source="layer_adapter" style="endArrow=classic;html=1;rounded=0;strokeColor=#777777;strokeWidth=1;" target="n_groupn" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

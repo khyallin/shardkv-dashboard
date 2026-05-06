@@ -94,7 +94,7 @@ func (s *ConfigService) SetMode(mode string) error {
 	case "success":
 		s.rebalancer = &rebalance.SuccessAwareRebalancer{}
 	case "gradual":
-		s.rebalancer = &rebalance.GradualRebalancer{}
+		s.rebalancer = rebalance.NewGradualRebalancer()
 	case "default", "multidim":
 		s.rebalancer = rebalance.New()
 	default:
@@ -115,7 +115,7 @@ func (s *ConfigService) setup() {
 }
 
 func (s *ConfigService) ticker() {
-	ticker := time.NewTicker(time.Second * 10)
+	ticker := time.NewTicker(time.Second * 5)
 	for range ticker.C {
 		if s.dead.Load() == 1 {
 			return
